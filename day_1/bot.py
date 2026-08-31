@@ -13,6 +13,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 MAX_HISTORY_MESSAGES = 20
+TELEGRAM_MESSAGE_LIMIT = 4096
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -45,8 +46,15 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Sorry, I couldn't reach DeepSeek right now. Try again in a bit.")
         return
 
+    if not reply:
+        logger.warning("DeepSeek returned an empty reply")
+        await update.message.reply_text("Sorry, I didn't get a usable reply from DeepSeek. Try rephrasing.")
+        return
+
     history.append({"role": "assistant", "content": reply})
-    await update.message.reply_text(reply)
+
+    for i in range(0, len(reply), TELEGRAM_MESSAGE_LIMIT):
+        await update.message.reply_text(reply[i : i + TELEGRAM_MESSAGE_LIMIT])
 
 
 def main() -> None:
