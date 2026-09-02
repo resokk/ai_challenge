@@ -1,17 +1,21 @@
 import logging
 
-from telegram import Update
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from config import DEEPSEEK_MODEL, TELEGRAM_BOT_TOKEN
 from deepseek_client import (
+    DEFAULT_MODE,
     DEFAULT_RESPONSE_FORMAT,
     DEFAULT_SYSTEM_PROMPT,
     MAX_STOP_SEQUENCES,
+    VALID_MODES,
     VALID_RESPONSE_FORMATS,
+    generate_smart_prompt,
     get_reply,
+    get_team_reply,
 )
 
 logging.basicConfig(
@@ -25,33 +29,86 @@ MAX_SYSTEM_PROMPT_LENGTH = 2000
 TELEGRAM_MESSAGE_LIMIT = 4096
 MAX_TOKENS_LIMIT = 8192
 
+BOT_COMMANDS = (
+    BotCommand("clear", "Clear history"),
+    BotCommand("reset", "Reset everything"),
+    BotCommand("format", "Set response format"),
+    BotCommand("mode", "Set reasoning mode"),
+    BotCommand("stats", "Show stats"),
+)
+
+
+async def _post_init(application: Application) -> None:
+    await application.bot.set_my_commands(BOT_COMMANDS)
+
+
+ROOT_MENU_BUTTONS = (
+    ("Format", "format"),
+    ("Mode", "mode"),
+    ("Max length", "maxlength"),
+    ("Stop sequences", "stopon"),
+    ("System prompt", "system"),
+    ("Stats", "stats"),
+    ("Clear history", "clear"),
+    ("Reset all", "reset"),
+)
+
+
+def _build_root_menu() -> InlineKeyboardMarkup:
+    buttons = [InlineKeyboardButton(label, callback_data=f"menu:{action}") for label, action in ROOT_MENU_BUTTONS]
+    rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(rows)
+
+
+def _back_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton("« Menu", callback_data="menu:root")]])
+
+
+def _build_menu(prefix: str, options: tuple, current: str, columns: int = 1) -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(f"✓ {opt}" if opt == current else opt, callback_data=f"{prefix}:{opt}")
+        for opt in options
+    ]
+    rows = [buttons[i : i + columns] for i in range(0, len(buttons), columns)]
+    rows.append([InlineKeyboardButton("« Menu", callback_data="menu:root")])
+    return InlineKeyboardMarkup(rows)
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.chat_data.clear()
-    await update.message.reply_text(f"Hi {update.effective_user.first_name}! I'm alive. Ask me anything.")
+    await update.message.reply_text(
+        f"Hi {update.effective_user.first_name}! I'm alive. Ask me anything, or use the menu below.",
+        reply_markup=_build_root_menu(),
+    )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Send me any message and I'll reply using DeepSeek.\n"
+        "/menu - open the settings menu\n"
         "/clear - clear our conversation history\n"
         "/reset - clear our conversation history and revert all settings to default\n"
         "/system [prompt|reset] - view, set, or reset the system prompt\n"
         "/format [text|markdown|json|xml] - view or set the response format\n"
         "/maxlength [tokens|unlimited] - view, set, or clear the max reply length\n"
         "/stopon [seq1,seq2,...|clear] - view, set, or clear stop sequences (max 4)\n"
+        "/mode [DIRECT|STEP_BY_STEP|SMART_PROMPT|TEAM] - view or set the reasoning mode\n"
         "/stats - show usage stats for this chat"
     )
 
 
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("Main menu:", reply_markup=_build_root_menu())
+
+
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.chat_data["history"] = []
-    await update.message.reply_text("Conversation history cleared.")
+    await update.message.reply_text("Conversation history cleared.", reply_markup=_back_menu())
 
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.chat_data.clear()
-    await update.message.reply_text("Chat cleared and all settings reverted to default.")
+    await update.message.reply_text("Chat cleared and all settings reverted to default.", reply_markup=_back_menu())
 
 
 def _parse_arg(update: Update, lower: bool = False) -> str:
@@ -60,12 +117,50 @@ def _parse_arg(update: Update, lower: bool = False) -> str:
     return arg.lower() if lower else arg
 
 
+def _system_view(context: ContextTypes.DEFAULT_TYPE) -> tuple:
+    current = context.chat_data.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
+    text = (
+        f"Current system prompt:\n\n{current}\n\n"
+        "Use /system <prompt> to change it, or /system reset to restore the default."
+    )
+    return text, _back_menu()
+
+
+def _maxlength_view(context: ContextTypes.DEFAULT_TYPE) -> tuple:
+    current = context.chat_data.get("max_tokens")
+    text = (
+        f"Current max length: {current if current else 'unlimited'} tokens\n\n"
+        "Use /maxlength <tokens> to set it, or /maxlength unlimited to clear it."
+    )
+    return text, _back_menu()
+
+
+def _stopon_view(context: ContextTypes.DEFAULT_TYPE) -> tuple:
+    current = context.chat_data.get("stop")
+    body = "\n".join(current) if current else "none"
+    text = (
+        f"Current stop sequences:\n{body}\n\n"
+        "Use /stopon <seq1,seq2,...> to set them, or /stopon clear to remove them."
+    )
+    return text, _back_menu()
+
+
+def _format_view(context: ContextTypes.DEFAULT_TYPE) -> tuple:
+    current = context.chat_data.get("response_format", DEFAULT_RESPONSE_FORMAT)
+    return f"Current format: {current}", _build_menu("format", VALID_RESPONSE_FORMATS, current, columns=2)
+
+
+def _mode_view(context: ContextTypes.DEFAULT_TYPE) -> tuple:
+    current = context.chat_data.get("mode", DEFAULT_MODE)
+    return f"Current mode: {current}", _build_menu("mode", VALID_MODES, current)
+
+
 async def system_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     arg = _parse_arg(update)
 
     if not arg:
-        current = context.chat_data.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
-        await update.message.reply_text(f"Current system prompt:\n\n{current}")
+        text, markup = _system_view(context)
+        await update.message.reply_text(text, reply_markup=markup)
         return
 
     if arg.lower() == "reset":
@@ -85,15 +180,14 @@ async def system_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def format_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     arg = _parse_arg(update, lower=True)
-    options = ", ".join(VALID_RESPONSE_FORMATS)
 
     if not arg:
-        current = context.chat_data.get("response_format", DEFAULT_RESPONSE_FORMAT)
-        await update.message.reply_text(f"Current format: {current}\nOptions: {options}")
+        text, markup = _format_view(context)
+        await update.message.reply_text(text, reply_markup=markup)
         return
 
     if arg not in VALID_RESPONSE_FORMATS:
-        await update.message.reply_text(f"Unknown format '{arg}'. Options: {options}")
+        await update.message.reply_text(f"Unknown format '{arg}'. Options: {', '.join(VALID_RESPONSE_FORMATS)}")
         return
 
     context.chat_data["response_format"] = arg
@@ -104,8 +198,8 @@ async def maxlength_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     arg = _parse_arg(update, lower=True)
 
     if not arg:
-        current = context.chat_data.get("max_tokens")
-        await update.message.reply_text(f"Current max length: {current if current else 'unlimited'} tokens")
+        text, markup = _maxlength_view(context)
+        await update.message.reply_text(text, reply_markup=markup)
         return
 
     if arg == "unlimited":
@@ -132,11 +226,8 @@ async def stopon_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     arg = _parse_arg(update)
 
     if not arg:
-        current = context.chat_data.get("stop")
-        if current:
-            await update.message.reply_text("Current stop sequences:\n" + "\n".join(current))
-        else:
-            await update.message.reply_text("No stop sequences set.")
+        text, markup = _stopon_view(context)
+        await update.message.reply_text(text, reply_markup=markup)
         return
 
     if arg.lower() == "clear":
@@ -160,15 +251,33 @@ async def stopon_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text(f"Stop sequences set: {', '.join(sequences)}")
 
 
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    arg = _parse_arg(update)
+
+    if not arg:
+        text, markup = _mode_view(context)
+        await update.message.reply_text(text, reply_markup=markup)
+        return
+
+    mode = arg.upper()
+    if mode not in VALID_MODES:
+        await update.message.reply_text(f"Unknown mode '{arg}'. Options: {', '.join(VALID_MODES)}")
+        return
+
+    context.chat_data["mode"] = mode
+    await update.message.reply_text(f"Mode set to {mode}.")
+
+
+def _stats_text(context: ContextTypes.DEFAULT_TYPE) -> str:
     history = context.chat_data.get("history", [])
     message_count = context.chat_data.get("message_count", 0)
     has_custom_prompt = "system_prompt" in context.chat_data
     response_format = context.chat_data.get("response_format", DEFAULT_RESPONSE_FORMAT)
     max_tokens = context.chat_data.get("max_tokens")
     stop = context.chat_data.get("stop")
+    mode = context.chat_data.get("mode", DEFAULT_MODE)
 
-    await update.message.reply_text(
+    return (
         "Stats for this chat:\n"
         f"Messages sent: {message_count}\n"
         f"Messages in context: {len(history)}/{MAX_HISTORY_MESSAGES}\n"
@@ -176,8 +285,60 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"System prompt: {'custom' if has_custom_prompt else 'default'}\n"
         f"Format: {response_format}\n"
         f"Max length: {max_tokens if max_tokens else 'unlimited'} tokens\n"
-        f"Stop sequences: {', '.join(stop) if stop else 'none'}"
+        f"Stop sequences: {', '.join(stop) if stop else 'none'}\n"
+        f"Mode: {mode}"
     )
+
+
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(_stats_text(context), reply_markup=_back_menu())
+
+
+ROOT_MENU_VIEWS = {
+    "format": _format_view,
+    "mode": _mode_view,
+    "system": _system_view,
+    "maxlength": _maxlength_view,
+    "stopon": _stopon_view,
+}
+
+
+async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    prefix, _, value = query.data.partition(":")
+
+    if prefix == "mode" and value in VALID_MODES:
+        context.chat_data["mode"] = value
+        text, markup = _mode_view(context)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if prefix == "format" and value in VALID_RESPONSE_FORMATS:
+        context.chat_data["response_format"] = value
+        text, markup = _format_view(context)
+        await query.edit_message_text(text, reply_markup=markup)
+        return
+
+    if prefix != "menu":
+        return
+
+    if value == "root":
+        await query.edit_message_text("Main menu:", reply_markup=_build_root_menu())
+    elif value in ROOT_MENU_VIEWS:
+        text, markup = ROOT_MENU_VIEWS[value](context)
+        await query.edit_message_text(text, reply_markup=markup)
+    elif value == "stats":
+        await query.edit_message_text(_stats_text(context), reply_markup=_back_menu())
+    elif value == "clear":
+        context.chat_data["history"] = []
+        await query.edit_message_text("Conversation history cleared.", reply_markup=_back_menu())
+    elif value == "reset":
+        context.chat_data.clear()
+        await query.edit_message_text(
+            "Chat cleared and all settings reverted to default.", reply_markup=_back_menu()
+        )
 
 
 def _split_message(text: str, limit: int = TELEGRAM_MESSAGE_LIMIT) -> list:
@@ -201,6 +362,35 @@ def _split_message(text: str, limit: int = TELEGRAM_MESSAGE_LIMIT) -> list:
     return chunks
 
 
+async def _get_mode_reply(
+    update: Update,
+    history: list,
+    system_prompt: str,
+    response_format: str,
+    max_tokens,
+    stop,
+    mode: str,
+) -> str:
+    if mode == "STEP_BY_STEP":
+        outgoing = [*history[:-1], {**history[-1], "content": f"{history[-1]['content']}\nProceed step by step."}]
+        return await get_reply(outgoing, system_prompt, response_format, max_tokens, stop)
+
+    if mode == "SMART_PROMPT":
+        generated_prompt = await generate_smart_prompt(history)
+        for chunk in _split_message(f"Generated prompt:\n\n{generated_prompt}"):
+            await update.message.reply_text(chunk)
+        await update.message.chat.send_action("typing")
+        outgoing = [*history[:-1], {"role": "user", "content": generated_prompt}]
+        return await get_reply(outgoing, system_prompt, response_format, max_tokens, stop)
+
+    if mode == "TEAM":
+        await update.message.reply_text("Assembling the team (analyst, scientist, engineer, critic)...")
+        await update.message.chat.send_action("typing")
+        return await get_team_reply(history, system_prompt, response_format, max_tokens, stop)
+
+    return await get_reply(history, system_prompt, response_format, max_tokens, stop)
+
+
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     history = context.chat_data.setdefault("history", [])
     history.append({"role": "user", "content": update.message.text})
@@ -210,11 +400,12 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     response_format = context.chat_data.get("response_format", DEFAULT_RESPONSE_FORMAT)
     max_tokens = context.chat_data.get("max_tokens")
     stop = context.chat_data.get("stop")
+    mode = context.chat_data.get("mode", DEFAULT_MODE)
 
     await update.message.chat.send_action("typing")
 
     try:
-        reply = await get_reply(history, system_prompt, response_format, max_tokens, stop)
+        reply = await _get_mode_reply(update, history, system_prompt, response_format, max_tokens, stop, mode)
     except Exception:
         logger.exception("DeepSeek API call failed")
         if history and history[-1]["role"] == "user":
@@ -242,17 +433,20 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def main() -> None:
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(_post_init).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("clear", clear))
     application.add_handler(CommandHandler("reset", reset))
     application.add_handler(CommandHandler("system", system_command))
     application.add_handler(CommandHandler("format", format_command))
     application.add_handler(CommandHandler("maxlength", maxlength_command))
     application.add_handler(CommandHandler("stopon", stopon_command))
+    application.add_handler(CommandHandler("mode", mode_command))
     application.add_handler(CommandHandler("stats", stats))
+    application.add_handler(CallbackQueryHandler(menu_button))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)

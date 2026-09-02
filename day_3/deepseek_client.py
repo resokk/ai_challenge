@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -25,6 +26,9 @@ client = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 
 
 MAX_STOP_SEQUENCES = 4
+
+VALID_MODES = ("DIRECT", "STEP_BY_STEP", "SMART_PROMPT", "TEAM")
+DEFAULT_MODE = "DIRECT"
 
 
 def _sanitize_tag(key: str) -> str:
@@ -68,19 +72,20 @@ def json_to_xml(data: object, root_tag: str = "response") -> str:
     return ET.tostring(root, encoding="unicode")
 
 
-async def get_reply(
-    history: list[dict],
-    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+def _augment_system_prompt(system_prompt: str, response_format: str) -> str:
+    if response_format in ("json", "xml") and "json" not in system_prompt.lower():
+        return f"{system_prompt}\nRespond only with a valid JSON object."
+    if response_format == "markdown":
+        return f"{system_prompt}\nFormat your response using Telegram-compatible Markdown."
+    return system_prompt
+
+
+async def _complete(
+    messages: list[dict],
     response_format: str = DEFAULT_RESPONSE_FORMAT,
     max_tokens: int | None = None,
     stop: list[str] | None = None,
 ) -> str:
-    if response_format in ("json", "xml") and "json" not in system_prompt.lower():
-        system_prompt = f"{system_prompt}\nRespond only with a valid JSON object."
-    elif response_format == "markdown":
-        system_prompt = f"{system_prompt}\nFormat your response using Telegram-compatible Markdown."
-
-    messages = [{"role": "system", "content": system_prompt}, *history]
     kwargs = {}
     if max_tokens is not None:
         kwargs["max_tokens"] = max_tokens
@@ -101,3 +106,77 @@ async def get_reply(
             logger.warning("Failed to convert JSON reply to XML, returning raw JSON")
 
     return content
+
+
+async def get_reply(
+    history: list[dict],
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+    response_format: str = DEFAULT_RESPONSE_FORMAT,
+    max_tokens: int | None = None,
+    stop: list[str] | None = None,
+) -> str:
+    messages = [{"role": "system", "content": _augment_system_prompt(system_prompt, response_format)}, *history]
+    return await _complete(messages, response_format, max_tokens, stop)
+
+
+SMART_PROMPT_SYSTEM_PROMPT = (
+    "You are a prompt engineer. Rewrite the user's latest message into a clear, detailed, "
+    "well-structured prompt that another AI assistant can follow to give the best possible "
+    "answer. Preserve the original intent and any constraints implied by the conversation. "
+    "Output only the rewritten prompt, with no extra commentary."
+)
+
+
+async def generate_smart_prompt(history: list[dict]) -> str:
+    messages = [{"role": "system", "content": SMART_PROMPT_SYSTEM_PROMPT}, *history]
+    return await _complete(messages, response_format="text")
+
+
+TEAM_ROLE_PROMPTS = {
+    "analyst": (
+        "You are the team's analyst. Break the user's request down into clear requirements, "
+        "constraints, and edge cases, and outline your recommended approach."
+    ),
+    "scientist": (
+        "You are the team's scientist. Ground your answer in evidence and first principles, "
+        "and clearly flag assumptions or uncertainty."
+    ),
+    "engineer": (
+        "You are the team's engineer. Focus on a concrete, practical, efficient solution or "
+        "implementation for the user's request."
+    ),
+}
+
+TEAM_CRITIC_PROMPT = (
+    "You are the team's critic and final voice. Review the drafts below from the analyst, "
+    "scientist, and engineer, resolve any disagreements between them, and write one clear, "
+    "complete, final answer for the user. Do not mention the team, the drafts, or the review "
+    "process - just answer as yourself."
+)
+
+
+async def _get_role_draft(history: list[dict], system_prompt: str, role_prompt: str) -> str:
+    messages = [{"role": "system", "content": f"{system_prompt}\n\n{role_prompt}"}, *history]
+    return await _complete(messages, response_format="text")
+
+
+async def get_team_reply(
+    history: list[dict],
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+    response_format: str = DEFAULT_RESPONSE_FORMAT,
+    max_tokens: int | None = None,
+    stop: list[str] | None = None,
+) -> str:
+    roles = list(TEAM_ROLE_PROMPTS)
+    drafts = await asyncio.gather(
+        *(_get_role_draft(history, system_prompt, TEAM_ROLE_PROMPTS[role]) for role in roles)
+    )
+    draft_summary = "\n\n".join(f"{role.capitalize()} draft:\n{draft}" for role, draft in zip(roles, drafts))
+
+    critic_history = [
+        *history[:-1],
+        {"role": "user", "content": f"{history[-1]['content']}\n\n---\nTeam drafts to synthesize:\n\n{draft_summary}"},
+    ]
+    critic_system_prompt = _augment_system_prompt(f"{system_prompt}\n\n{TEAM_CRITIC_PROMPT}", response_format)
+    messages = [{"role": "system", "content": critic_system_prompt}, *critic_history]
+    return await _complete(messages, response_format, max_tokens, stop)
