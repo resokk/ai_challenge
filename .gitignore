@@ -61,9 +61,10 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Bot message log, per-user profiles and persisted chat settings
+# Bot message log, per-user profiles and tasks, and persisted chat settings
 messages.db
 profiles.db
+bot.db
 chat_settings.pkl
 
 # Flask stuff:
