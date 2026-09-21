@@ -1,0 +1,8 @@
+[project]
+name = "calc-mcp"
+version = "0.1.0"
+description = "An MCP server with one tool: eval, which calculates a mathematical expression."
+# The MCP SDK needs 3.10+, which is why this directory has its own interpreter
+# rather than sharing the bot's. uv reads .python-version and fetches one.
+requires-python = ">=3.10"
+dependencies = ["mcp>=2.2.0"]
