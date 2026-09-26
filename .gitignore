@@ -65,6 +65,7 @@ db.sqlite3-journal
 messages.db
 profiles.db
 bot.db
+sensor_log.db
 chat_settings.pkl
 
 # Flask stuff:

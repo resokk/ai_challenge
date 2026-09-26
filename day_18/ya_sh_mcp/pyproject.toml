@@ -1,0 +1,8 @@
+[project]
+name = "ya-sh-mcp"
+version = "0.1.0"
+description = "An MCP server over Yandex Smart Home: lists weather sensors and reads their temperature."
+requires-python = ">=3.10"
+# httpx2 already comes with mcp; it is listed because yandex.py imports it
+# directly, and a dependency this server uses should not depend on the SDK's.
+dependencies = ["mcp>=2.2.0", "httpx2>=2.13.0"]
