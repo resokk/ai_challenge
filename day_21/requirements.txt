@@ -1,0 +1,5 @@
+faiss-cpu
+numpy
+# optional, only for --chunking treesitter:
+# tree-sitter
+# tree-sitter-language-pack
