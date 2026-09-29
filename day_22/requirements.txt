@@ -1,0 +1,6 @@
+faiss-cpu
+mcp>=2.2.0   # only for the MCP server
+numpy
+# optional, only for --chunking treesitter:
+# tree-sitter
+# tree-sitter-language-pack
