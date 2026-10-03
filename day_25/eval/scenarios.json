@@ -1,0 +1,63 @@
+[
+  {
+    "name": "orders-api",
+    "goal_keywords": ["заказ", "order"],
+    "turns": [
+      {"user": "Я делаю API для интернет-магазина на ormar. Нужно отдавать список заказов постранично. С чего начать?",
+       "expect": ["QuerySet.paginate", "QuerysetProxy.paginate", "QuerySet.limit", "QuerySet.offset"]},
+      {"user": "Уточню: база у нас PostgreSQL, модели называются Order и Customer.",
+       "remember": ["postgres", "customer"]},
+      {"user": "Как получить только заказы конкретного покупателя?",
+       "expect": ["QuerySet.filter", "QuerysetProxy.filter"]},
+      {"user": "А как сразу подтянуть данные покупателя в том же запросе?",
+       "expect": ["QuerySet.select_related", "QuerysetProxy.select_related"]},
+      {"user": "Отсортируй их по дате создания, новые сначала.",
+       "expect": ["QuerySet.order_by", "QuerysetProxy.order_by", "FieldAccessor.desc"]},
+      {"user": "Важное ограничение: никакого сырого SQL, только методы ORM.",
+       "remember": ["sql"]},
+      {"user": "Как посчитать общее количество заказов, чтобы показать число страниц?",
+       "expect": ["QuerySet.count", "QuerysetProxy.count"]},
+      {"user": "Договоримся о термине: «активный заказ» — это заказ со статусом не cancelled.",
+       "remember": ["активный заказ"]},
+      {"user": "Как исключить из выборки неактивные заказы?",
+       "expect": ["QuerySet.exclude", "QuerysetProxy.exclude"]},
+      {"user": "Какая завтра погода в Москве?"},
+      {"user": "Вернёмся к API. Если покупателя с таким id нет, какая ошибка будет?",
+       "expect": ["NoMatch", "QuerySet.get", "QuerysetProxy.get"]},
+      {"user": "Клиенту нужны только поля id, total и created_at. Как ограничить колонки?",
+       "expect": ["QuerySet.fields", "QuerysetProxy.fields", "QuerySet.exclude_fields", "QuerySet.values"]},
+      {"user": "Подведи итог: какие методы ormar мне понадобятся для этого API?"}
+    ]
+  },
+  {
+    "name": "profile-import",
+    "goal_keywords": ["import", "profile", "импорт", "профил"],
+    "turns": [
+      {"user": "I'm building a nightly import of user profiles into a database with ormar. The email column must be encrypted. How does column encryption work?",
+       "expect": ["EncryptedString", "FernetBackend", "FernetBackend.encrypt", "EncryptBackend", "BaseField._get_encrypted_column",
+                  "EncryptedString.process_bind_param"]},
+      {"user": "We use Fernet, not hashing, because we need to read the emails back.",
+       "remember": ["fernet"]},
+      {"user": "What does the hash backend do differently?",
+       "expect": ["HashBackend", "HashBackend.encrypt"]},
+      {"user": "Each profile has addresses as related models. How do I save a profile together with its addresses?",
+       "expect": ["Model.save_related"]},
+      {"user": "Constraint: re-running the import must never create duplicate profiles.",
+       "remember": ["duplicate"]},
+      {"user": "So how should I insert a profile, or update it if it is already there?",
+       "expect": ["Model.upsert", "QuerySet.update_or_create", "QuerysetProxy.update_or_create"]},
+      {"user": "Term: 'stale profile' means a profile that was not in the latest import file.",
+       "remember": ["stale"]},
+      {"user": "How do I check whether a profile with a given email already exists?",
+       "expect": ["QuerySet.exists", "QuerysetProxy.exists"]},
+      {"user": "How do I delete the stale ones?",
+       "expect": ["Model.delete", "QuerySet.delete"]},
+      {"user": "Can ormar post a message to Slack when the import finishes?"},
+      {"user": "Back to the import: can I run my own code after each profile is saved?",
+       "expect": ["post_save", "receiver", "Model._emit_signal"]},
+      {"user": "How many profiles are in the table after the import? How do I count them?",
+       "expect": ["QuerySet.count", "QuerysetProxy.count"]},
+      {"user": "Sum up which ormar features the import job needs, given everything we agreed on."}
+    ]
+  }
+]
