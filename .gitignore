@@ -68,6 +68,8 @@ bot.db
 sensor_log.db
 # Code search indexes built by day_21
 day_21/index/
+day_23/index/
+day_24/index/
 chat_settings.pkl
 
 # Flask stuff:
