@@ -70,6 +70,7 @@ sensor_log.db
 day_21/index/
 day_23/index/
 day_24/index/
+day_25/index/
 chat_settings.pkl
 
 # Flask stuff:
