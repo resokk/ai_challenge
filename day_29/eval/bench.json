@@ -1,0 +1,163 @@
+{
+ "before: bf16, day 28": {
+  "model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "settings": {
+   "temperature": 0.0,
+   "top_p": 1.0,
+   "max_new_tokens": 2000,
+   "context_window": 32768
+  },
+  "answered": "8/10",
+  "sources": "8/10",
+  "quotes": "8/10",
+  "nothing removed": "7/10",
+  "no invented names": "7/10",
+  "right source": "8/10",
+  "said don't know": "2/3",
+  "errors": "2/13",
+  "load s": 11.6,
+  "total s": 206.5,
+  "s/answer": 17.7,
+  "prompt tokens/answer": 1485,
+  "reply tokens/answer": 189,
+  "memory GB": 7.44
+ },
+ "bf16 + settings": {
+  "model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "settings": {
+   "temperature": 0.0,
+   "top_p": 1.0,
+   "max_new_tokens": 768,
+   "context_window": 4096
+  },
+  "answered": "8/10",
+  "sources": "8/10",
+  "quotes": "8/10",
+  "nothing removed": "6/10",
+  "no invented names": "7/10",
+  "right source": "8/10",
+  "said don't know": "2/3",
+  "errors": "2/13",
+  "load s": 10.8,
+  "total s": 213.6,
+  "s/answer": 18.4,
+  "prompt tokens/answer": 1442,
+  "reply tokens/answer": 190,
+  "memory GB": 7.44
+ },
+ "bf16 + settings + prompt": {
+  "model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "settings": {
+   "temperature": 0.0,
+   "top_p": 1.0,
+   "max_new_tokens": 768,
+   "context_window": 4096
+  },
+  "answered": "10/10",
+  "sources": "10/10",
+  "quotes": "10/10",
+  "nothing removed": "10/10",
+  "no invented names": "10/10",
+  "right source": "10/10",
+  "said don't know": "3/3",
+  "errors": "0/13",
+  "load s": 10.2,
+  "total s": 147.8,
+  "s/answer": 12.5,
+  "prompt tokens/answer": 1646,
+  "reply tokens/answer": 109,
+  "memory GB": 7.44
+ },
+ "8-bit + settings + prompt": {
+  "model": "mlx-community/Qwen2.5-Coder-3B-Instruct-8bit",
+  "settings": {
+   "temperature": 0.0,
+   "top_p": 1.0,
+   "max_new_tokens": 768,
+   "context_window": 4096
+  },
+  "answered": "10/10",
+  "sources": "10/10",
+  "quotes": "10/10",
+  "nothing removed": "10/10",
+  "no invented names": "10/10",
+  "right source": "10/10",
+  "said don't know": "3/3",
+  "errors": "0/13",
+  "load s": 5.2,
+  "total s": 105.1,
+  "s/answer": 9.1,
+  "prompt tokens/answer": 1646,
+  "reply tokens/answer": 74,
+  "memory GB": 3.96
+ },
+ "4-bit + settings + prompt": {
+  "model": "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit",
+  "settings": {
+   "temperature": 0.0,
+   "top_p": 1.0,
+   "max_new_tokens": 768,
+   "context_window": 4096
+  },
+  "answered": "9/10",
+  "sources": "9/10",
+  "quotes": "9/10",
+  "nothing removed": "9/10",
+  "no invented names": "9/10",
+  "right source": "9/10",
+  "said don't know": "3/3",
+  "errors": "0/13",
+  "load s": 4.1,
+  "total s": 89.9,
+  "s/answer": 7.8,
+  "prompt tokens/answer": 1646,
+  "reply tokens/answer": 87,
+  "memory GB": 2.5
+ },
+ "4-bit, temperature 0.7": {
+  "model": "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit",
+  "settings": {
+   "temperature": 0.7,
+   "top_p": 0.9,
+   "max_new_tokens": 768,
+   "context_window": 4096
+  },
+  "answered": "5/10",
+  "sources": "5/10",
+  "quotes": "5/10",
+  "nothing removed": "5/10",
+  "no invented names": "5/10",
+  "right source": "4/10",
+  "said don't know": "3/3",
+  "errors": "0/13",
+  "load s": 3.2,
+  "total s": 77.8,
+  "s/answer": 6.8,
+  "prompt tokens/answer": 1646,
+  "reply tokens/answer": 58,
+  "memory GB": 2.5
+ },
+ "7B 4-bit + settings + prompt": {
+  "model": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+  "settings": {
+   "temperature": 0.0,
+   "top_p": 1.0,
+   "max_new_tokens": 768,
+   "context_window": 4096
+  },
+  "answered": "8/10",
+  "sources": "8/10",
+  "quotes": "8/10",
+  "nothing removed": "8/10",
+  "no invented names": "8/10",
+  "right source": "7/10",
+  "said don't know": "3/3",
+  "errors": "0/13",
+  "load s": 5.1,
+  "total s": 202.0,
+  "s/answer": 17.9,
+  "prompt tokens/answer": 1646,
+  "reply tokens/answer": 87,
+  "memory GB": 5.11
+ }
+}
