@@ -1,0 +1,10 @@
+faiss-cpu
+mcp>=2.2.0   # only for the MCP server
+numpy
+torch
+transformers
+sentence-transformers
+mlx-lm; sys_platform == "darwin" and platform_machine == "arm64"   # quantized models on Apple silicon
+# optional, only for --chunking treesitter:
+# tree-sitter
+# tree-sitter-language-pack
