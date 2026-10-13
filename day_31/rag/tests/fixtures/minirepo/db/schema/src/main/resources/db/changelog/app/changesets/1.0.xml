@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog">
+  <property name="clobType" value="TEXT" dbms="postgresql"/>
+  <property name="clobType" value="CLOB"/>
+
+  <!-- Orders placed by customers. One row per order. -->
+  <changeSet id="create_orders" author="acme">
+    <preConditions onFail="MARK_RAN"><not><tableExists tableName="${prefix}ORDERS"/></not></preConditions>
+    <createTable tableName="${prefix}ORDERS" remarks="Customer orders">
+      <column name="ORDER_KEY" type="BIGINT"><constraints primaryKey="true"/></column>
+      <column name="CUSTOMER_ID" type="NVARCHAR(${userCharColumnSize})" remarks="External customer id"/>
+      <column name="STATE" type="VARCHAR(20)"><constraints nullable="false"/></column>
+      <column name="PAYLOAD" type="${clobType}"/>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="create_order_items" author="acme">
+    <createTable tableName="${prefix}ORDER_ITEM">
+      <column name="ITEM_KEY" type="BIGINT"><constraints primaryKey="true"/></column>
+      <column name="ORDER_KEY" type="BIGINT">
+        <constraints foreignKeyName="FK_ITEM_ORDER" references="${prefix}ORDERS(ORDER_KEY)"/>
+      </column>
+      <column name="SKU" type="VARCHAR(64)"/>
+    </createTable>
+    <createIndex tableName="${prefix}ORDER_ITEM" indexName="IDX_ITEM_ORDER">
+      <column name="ORDER_KEY"/>
+    </createIndex>
+  </changeSet>
+
+  <changeSet id="oracle_only_column" author="acme" dbms="oracle">
+    <addColumn tableName="${prefix}ORDERS"><column name="ORA_HINT" type="VARCHAR(10)"/></addColumn>
+  </changeSet>
+
+  <changeSet id="test_context_table" author="acme" context="test">
+    <createTable tableName="${prefix}TEST_ONLY"><column name="ID" type="BIGINT"/></createTable>
+  </changeSet>
+
+  <changeSet id="unknown_check" author="acme">
+    <preConditions onFail="MARK_RAN"><sqlCheck expectedResult="0">SELECT COUNT(*) FROM ${prefix}ORDERS</sqlCheck></preConditions>
+    <addColumn tableName="${prefix}ORDERS"><column name="MAYBE_COL" type="INT"/></addColumn>
+  </changeSet>
+</databaseChangeLog>
