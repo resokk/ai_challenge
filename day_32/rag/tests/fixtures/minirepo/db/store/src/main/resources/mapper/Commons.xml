@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.acme.store.Commons">
+  <sql id="paging">${paging.after}</sql>
+  <sql id="paging" databaseId="oracle">${paging.after}</sql>
+  <sql id="condition">
+    <choose>
+      <when test="op.name().equals('EQUALS')">= #{op.value}</when>
+      <when test="op.name().equals('IN')">IN <foreach collection="op.values" item="v" open="(" separator=", " close=")">#{v}</foreach></when>
+      <otherwise>IS NOT NULL</otherwise>
+    </choose>
+  </sql>
+</mapper>

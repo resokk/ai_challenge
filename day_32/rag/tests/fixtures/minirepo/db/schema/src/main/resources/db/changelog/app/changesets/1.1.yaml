@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: rename_sku
+      author: acme
+      changes:
+        - renameColumn:
+            tableName: ${prefix}ORDER_ITEM
+            oldColumnName: SKU
+            newColumnName: PRODUCT_SKU
+  - changeSet:
+      id: sql_alter
+      author: acme
+      changes:
+        - sql:
+            sql: ALTER TABLE ${prefix}ORDERS ADD COLUMN NOTE VARCHAR(100)
