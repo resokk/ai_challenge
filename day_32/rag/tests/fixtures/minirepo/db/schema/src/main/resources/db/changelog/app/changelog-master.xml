@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog">
+  <include file="/db/changelog/app/changesets/1.0.xml"/>
+  <include file="changesets/1.1.yaml" relativeToChangelogFile="true"/>
+</databaseChangeLog>

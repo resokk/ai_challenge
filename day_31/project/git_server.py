@@ -20,8 +20,12 @@ server = MCPServer("git", instructions="Read-only view of the project's git repo
 repo = "."  # set by main()
 
 
+def run_git(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+
+
 def git(*args: str) -> str:
-    proc = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+    proc = run_git(*args)
     if proc.returncode != 0:
         raise ToolError(proc.stderr.strip() or f"git {args[0]} failed")
     return proc.stdout
@@ -29,22 +33,27 @@ def git(*args: str) -> str:
 
 @server.tool()
 def git_branch() -> str:
-    """Name of the current git branch (or "HEAD" when detached)."""
-    return git("rev-parse", "--abbrev-ref", "HEAD").strip()
+    """Name of the current git branch, also before the first commit; "detached at <sha>" when detached."""
+    proc = run_git("symbolic-ref", "--short", "-q", "HEAD")  # unlike rev-parse, works without commits
+    if proc.returncode == 0:
+        return proc.stdout.strip()
+    return f"detached at {git('rev-parse', '--short', 'HEAD').strip()}"
 
 
 @server.tool()
-def git_diff(staged: bool = False, path: str | None = None) -> str:
-    """Diff of uncommitted changes. staged=true shows what is staged for commit instead of
-    unstaged changes; path limits the diff to one file or directory."""
-    args = ["diff", "--no-color"]
-    if staged:
-        args.append("--staged")
-    if path:
-        args += ["--", path]  # after "--" so a path can't be read as an option
-    diff = git(*args)
-    if not diff:
+def git_diff(path: str | None = None) -> str:
+    """All uncommitted changes to tracked files: the staged diff (what the next commit would contain)
+    and the unstaged one, each under its own heading. path limits both to one file or directory.
+    Untracked files are not included until they are added with git add."""
+    pathspec = ["--", path] if path else []  # after "--" so a path can't be read as an option
+    sections = []
+    for title, extra in (("Staged changes", ["--staged"]), ("Unstaged changes", [])):
+        part = git("diff", "--no-color", *extra, *pathspec)
+        if part:
+            sections.append(f"## {title}\n{part}")
+    if not sections:
         return "No changes."
+    diff = "\n".join(sections)
     if len(diff) > MAX_DIFF_CHARS:
         return diff[:MAX_DIFF_CHARS] + f"\n... [truncated, {len(diff)} chars total]"
     return diff

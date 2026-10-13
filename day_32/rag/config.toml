@@ -1,0 +1,24 @@
+# Local configuration. Environment variables CAMUNDA_RAG_<FIELD> (nested: CAMUNDA_RAG_EMBEDDING__DEVICE) override it.
+repo_path = "~/src/camunda"
+repository_url = "https://github.com/camunda/camunda.git"
+dialects = ["postgresql", "mysql", "mariadb", "oracle", "mssql", "h2"]
+default_dialect = "postgresql"
+table_prefix = ""
+liquibase_contexts = []
+liquibase_labels = []
+maven_cmd = "~/tools/apache-maven-3.9.9/bin/mvn"
+
+[embedding]
+model_name = "BAAI/bge-m3"
+model_path = "models/bge-m3"
+device = "auto"      # auto | cpu | mps | cuda
+batch_size = 8
+max_tokens = 1024
+offline = true
+
+[limits]
+mybatis_max_variants = 8
+mybatis_foreach_iterations = 1
+java_max_depth = 8
+java_max_variants = 8
+java_max_loop_unroll = 1
