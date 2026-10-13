@@ -1,0 +1,10 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "key": { "type": "long" },
+      "state": { "type": "keyword" },
+      "customer": { "properties": { "id": { "type": "keyword" }, "name": { "type": "text", "fields": { "raw": { "type": "keyword" } } } } }
+    }
+  }
+}

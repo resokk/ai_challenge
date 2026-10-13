@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.acme.store.OrderMapper">
+
+  <resultMap id="orderResultMap" type="org.acme.store.OrderEntity">
+    <constructor>
+      <idArg column="ORDER_KEY" javaType="java.lang.Long" name="orderKey"/>
+      <arg column="CUSTOMER_ID" javaType="java.lang.String" name="customerId"/>
+    </constructor>
+    <result column="STATE" property="state"/>
+  </resultMap>
+
+  <!-- search orders with their items -->
+  <select id="search" resultMap="orderResultMap">
+    <bind name="pattern" value="'%' + filter.sku + '%'"/>
+    SELECT o.ORDER_KEY, o.CUSTOMER_ID, o.STATE
+    FROM ${prefix}ORDERS o
+    JOIN ${prefix}ORDER_ITEM i ON i.ORDER_KEY = o.ORDER_KEY
+    <where>
+      <if test="filter.state != null">AND o.STATE <include refid="org.acme.store.Commons.condition"/></if>
+      <if test="filter.kind == 'A'">AND o.CUSTOMER_ID = 'a'</if>
+      <if test="filter.kind == 'B'">AND o.CUSTOMER_ID = 'b'</if>
+      <if test="filter.sku != null">AND i.PRODUCT_SKU LIKE #{pattern} ESCAPE ${escapeChar}</if>
+    </where>
+    <if test="sort != null">ORDER BY ${sort.column}</if>
+    <include refid="org.acme.store.Commons.paging"/>
+  </select>
+
+  <insert id="insert" parameterType="org.acme.store.OrderDbModel">
+    INSERT INTO ${prefix}ORDERS (ORDER_KEY, CUSTOMER_ID, STATE) VALUES (#{orderKey}, #{customerId, jdbcType=VARCHAR}, #{state})
+  </insert>
+
+  <update id="updateState">
+    UPDATE ${prefix}ORDERS
+    <set>
+      <if test="state != null">STATE = #{state},</if>
+      <if test="customerId != null">CUSTOMER_ID = #{customerId},</if>
+    </set>
+    WHERE ORDER_KEY = #{orderKey}
+  </update>
+
+  <delete id="purge">
+    DELETE FROM ${tableName}
+  </delete>
+</mapper>
