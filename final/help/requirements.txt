@@ -1,0 +1,10 @@
+torch==2.14.1
+transformers==5.20.1
+numpy==2.4.6
+openai==1.51.2
+# openai 1.51.2 passes `proxies` to httpx, which httpx 0.28 removed.
+httpx==0.27.2
+mcp==2.3.0
+python-dotenv==1.0.1
+pytest==8.3.3
+pytest-asyncio==0.24.0
